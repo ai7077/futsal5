@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>フットサル管理システム</title>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 15px; background-color: #f4f7f9; color: #333; font-size: 13px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        h1, h2 { color: #2c3e50; border-left: 5px solid #27ae60; padding-left: 10px; margin-bottom: 12px; font-size: 1.1em; }
+        .date-range { font-size: 0.8em; color: #666; margin-bottom: 15px; background: #eee; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+        .input-section { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 25px; }
+        .date-row { display: flex; align-items: center; gap: 8px; font-weight: bold; margin-bottom: 20px; }
+        #matchDate { padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px; }
+        .member-setup-block { display: flex; flex-direction: column; align-items: flex-start; width: 100%; }
+        
+        /* 登録エリアのレイアウト修正 */
+        .add-member-row { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 12px; align-items: center; width: 100%; }
+        .input-group { display: flex; gap: 4px; align-items: center; }
+        .participant-count-display { font-weight: bold; color: #27ae60; background: #e8f5e9; padding: 4px 12px; border-radius: 20px; border: 1px solid #c8e6c9; white-space: nowrap; }
+
+        .member-list-wrapper { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+        .member-list-column { display: flex; flex-direction: column; gap: 3px; background: white; padding: 6px; border: 1px solid #eee; border-radius: 6px; width: 180px; box-sizing: border-box; flex-shrink: 0; }
+        .member-row { display: flex; gap: 4px; align-items: center; padding: 3px 0; border-bottom: 1px solid #f0f0f0; }
+        .member-row:last-child { border-bottom: none; }
+        .status-toggle { width: 42px; padding: 3px 0; border-radius: 4px; border: 1px solid #ccc; font-size: 9px; cursor: pointer; text-align: center; flex-shrink: 0; transition: 0.2s; }
+        .status-active { background-color: #27ae60; color: white; border-color: #27ae60; }
+        .status-absent { background-color: #bdc3c7; color: white; border-color: #bdc3c7; }
+        .name-label { flex: 1; font-weight: bold; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .score-in { width: 30px; padding: 3px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-size: 11px; }
+        .score-in:disabled { background-color: #eee; cursor: not-allowed; }
+        
+        .btn-save { background-color: #27ae60; color: white; width: 180px; padding: 10px; margin-top: 15px; font-size: 14px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-add-new { background-color: #3498db; color: white; font-size: 11px; padding: 7px 12px; border: none; border-radius: 4px; cursor: pointer; }
+        
+        .main-layout { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 768px) { .main-layout { grid-template-columns: 1.2fr 0.8fr; } }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; background: white; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #2c3e50; color: white; }
+        
+        .sort-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+        .tab-btn { background-color: #ecf0f1; color: #7f8c8d; padding: 8px; flex: 1; font-size: 0.8em; border-radius: 4px; border:none; cursor:pointer;}
+        .tab-btn.active { background-color: #2c3e50; color: white; }
+        
+        .history-list { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 4px; 
+            max-height: 500px; 
+            overflow-y: auto; 
+            padding: 5px;
+            border: 1px solid #f0f0f0;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; background: #fff; border: 1px solid #eee; border-radius: 4px; margin-bottom: 2px; }
+        .history-btns { display: flex; gap: 20px; align-items: center; }
+        .action-btn { font-size: 0.85em; cursor: pointer; text-decoration: none; font-weight: bold; }
+        .delete-btn { color: #e74c3c; font-size: 1.25em; margin-left: 5px; }
+        
+        .no-print { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        #textOutput { width: 100%; height: 200px; margin-top: 10px; display: none; padding: 10px; font-family: monospace; border: 2px solid #3498db; white-space: pre; }
+        
+        @media print {
+            .no-print, .input-section, .history-section, .sort-tabs, h1, h2:not(.ranking-title), .history-list { display: none !important; }
+            .main-layout { display: block; }
+            .ranking-title { text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="no-print">フットサル管理</h1>
+
+    <div class="input-section no-print">
+        <h2 id="inputLabel">今日の記録</h2>
+        <input type="hidden" id="editingId">
+        <div class="date-row">日付：<input type="date" id="matchDate"></div>
+        <div class="member-setup-block">
+            <div class="add-member-row">
+                <div class="input-group">
+                    <input type="text" id="newMemberName" placeholder="名前を入力" style="width: 120px; padding: 7px; font-size:12px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button type="button" class="btn-add-new" onclick="addNewMember()">登録</button>
+                </div>
+                <div id="activeCount" class="participant-count-display">参加人数：0名</div>
+            </div>
+            <div id="memberListWrapper" class="member-list-wrapper"></div>
+            <button id="saveBtn" class="btn-save" onclick="saveMatch()">保存</button>
+            <button id="cancelBtn" style="display:none; width:180px; margin-top:5px; background:#e74c3c; color:white; border-radius:6px; padding:8px; border:none; cursor:pointer;" onclick="resetForm()">キャンセル</button>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <section>
+            <h2 class="ranking-title">総合ランキング</h2>
+            <div id="dateDisplay" class="date-range">データ無</div>
+            <div class="sort-tabs no-print">
+                <button class="tab-btn active" onclick="updateUI('total')">得点順</button>
+                <button class="tab-btn" onclick="updateUI('avg')">平均点順</button>
+                <button class="tab-btn" onclick="updateUI('apps')">参加数順</button>
+            </div>
+            <table id="rankingTable">
+                <thead>
+                    <tr><th style="width:40px">順位</th><th>名前</th><th>得点</th><th>平均点</th><th>参加</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </section>
+
+        <section class="history-section">
+            <h2>履歴（最新15件程度表示）</h2>
+            <div id="historyList" class="history-list"></div>
+        </section>
+    </div>
+
+    <div class="no-print">
+        <button style="background:#3498db; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;" onclick="exportToText()">総合ランキング出力</button>
+        <button style="background:#e67e22; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;" onclick="window.print()">PDF保存</button>
+        <button style="background:#95a5a6; color:white; font-size: 0.8em; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;" onclick="clearHistoryData()">履歴全消去</button>
+    </div>
+    <textarea id="textOutput" class="no-print" readonly></textarea>
+</div>
+
+<script>
+    let matchHistory = JSON.parse(localStorage.getItem('futsal_v_final_history')) || [];
+    let savedNames = JSON.parse(localStorage.getItem('futsal_v_final_names')) || [];
+    let currentSort = 'total';
+
+    window.onload = function() {
+        document.getElementById('matchDate').valueAsDate = new Date();
+        renderInputMemberList();
+        updateUI('total');
+    };
+
+    function renderInputMemberList(scoresObj = {}) {
+        const wrapper = document.getElementById('memberListWrapper');
+        wrapper.innerHTML = "";
+        
+        // メンバーがいない場合のメッセージ
+        if (savedNames.length === 0) {
+            wrapper.innerHTML = "<p style='color:#999; font-size:11px; padding:10px;'>メンバーを登録してください</p>";
+            updateParticipantCount();
+            return;
+        }
+
+        const sorted = [...savedNames].sort();
+        let currentColumn;
+        sorted.forEach((name, index) => {
+            if (index % 10 === 0) {
+                currentColumn = document.createElement('div');
+                currentColumn.className = 'member-list-column';
+                wrapper.appendChild(currentColumn);
+            }
+            const isParticipating = name in scoresObj;
+            const score = isParticipating ? scoresObj[name] : "";
+            const div = document.createElement('div');
+            div.className = 'member-row';
+            div.innerHTML = `
+                <div class="status-toggle ${isParticipating ? 'status-active' : 'status-absent'}" onclick="toggleStatus(this)">${isParticipating ? '参加' : '欠席'}</div>
+                <div class="name-label" title="${name}">${name}</div>
+                <input type="number" inputmode="numeric" class="score-in" value="${score}" ${isParticipating ? '' : 'disabled'} placeholder="0">
+                <span class="delete-btn action-btn" onclick="deleteMember('${name}')" style="font-size:14px; color:#e74c3c; cursor:pointer;">×</span>
+            `;
+            currentColumn.appendChild(div);
+        });
+        updateParticipantCount();
+    }
+
+    function toggleStatus(btn) {
+        const input = btn.parentElement.querySelector('.score-in');
+        if (btn.innerText === "欠席") {
+            btn.innerText = "参加"; 
+            btn.classList.replace('status-absent', 'status-active'); 
+            input.disabled = false;
+            input.focus();
+            setTimeout(() => input.focus(), 10);
+        } else {
+            btn.innerText = "欠席"; 
+            btn.classList.replace('status-active', 'status-absent'); 
+            input.value = ""; 
+            input.disabled = true;
+        }
+        updateParticipantCount();
+    }
+
+    function updateParticipantCount() {
+        const activeCount = document.querySelectorAll('.status-active').length;
+        document.getElementById('activeCount').textContent = `参加人数：${activeCount}名`;
+    }
+
+    function addNewMember() {
+        const nameInput = document.getElementById('newMemberName');
+        const name = nameInput.value.trim();
+        
+        if (!name) {
+            alert("名前を入力してください。");
+            return;
+        }
+
+        if (savedNames.includes(name)) {
+            alert(`「${name}」はすでに登録されています。`);
+            nameInput.value = "";
+            nameInput.focus();
+            return;
+        }
+
+        savedNames.push(name);
+        localStorage.setItem('futsal_v_final_names', JSON.stringify(savedNames));
+        
+        nameInput.value = ""; 
+        renderInputMemberList();
+        console.log("Member added:", name); // デバッグ用
+    }
+
+    function deleteMember(name) {
+        if (confirm(`「${name}」をリストから完全に削除しますか？`)) {
+            savedNames = savedNames.filter(n => n !== name);
+            localStorage.setItem('futsal_v_final_names', JSON.stringify(savedNames));
+            renderInputMemberList();
+        }
+    }
+
+    function saveMatch() {
+        const date = document.getElementById('matchDate').value;
+        const editingId = document.getElementById('editingId').value;
+        let dailyScores = {};
+        let count = 0;
+        document.querySelectorAll('.member-row').forEach(row => {
+            if (row.querySelector('.status-toggle').innerText === "参加") {
+                const s = parseInt(row.querySelector('.score-in').value);
+                if (!isNaN(s)) { dailyScores[row.querySelector('.name-label').innerText] = s; count++; }
+            }
+        });
+        if (count === 0) return alert("参加者のスコアを入力してください");
+        
+        if (editingId) {
+            const idx = matchHistory.findIndex(m => m.id == editingId);
+            matchHistory[idx] = { ...matchHistory[idx], date, scores: dailyScores };
+        } else {
+            matchHistory.push({ id: Date.now(), date, scores: dailyScores });
+        }
+        localStorage.setItem('futsal_v_final_history', JSON.stringify(matchHistory));
+        resetForm(); updateUI(currentSort);
+    }
+
+    function resetForm() {
+        document.getElementById('editingId').value = "";
+        document.getElementById('matchDate').valueAsDate = new Date();
+        document.getElementById('inputLabel').textContent = "今日の記録";
+        document.getElementById('saveBtn').textContent = "保存";
+        document.getElementById('cancelBtn').style.display = "none";
+        renderInputMemberList();
+    }
+
+    function updateUI(sortType) {
+        currentSort = sortType;
+        const stats = {};
+        matchHistory.forEach(m => {
+            for (const [name, score] of Object.entries(m.scores)) {
+                if (!stats[name]) stats[name] = { total: 0, count: 0 };
+                stats[name].total += score; stats[name].count += 1;
+            }
+        });
+
+        const dateArea = document.getElementById('dateDisplay');
+        if (matchHistory.length > 0) {
+            const dates = matchHistory.map(m => m.date).sort();
+            dateArea.textContent = `${dates[0].replace(/-/g,'/')} 〜 ${dates[dates.length-1].replace(/-/g,'/')}`;
+        } else {
+            dateArea.textContent = "データ無";
+        }
+
+        let ranking = Object.keys(stats).map(name => ({
+            name, total: stats[name].total, apps: stats[name].count, avg: parseFloat((stats[name].total / stats[name].count).toFixed(1))
+        }));
+
+        ranking.sort((a, b) => {
+            if (sortType === 'total') return b.total - a.total || b.avg - a.avg || b.apps - a.apps;
+            if (sortType === 'avg') return b.avg - a.avg || b.total - a.total || b.apps - a.apps;
+            return b.apps - a.apps || b.total - a.total || b.avg - a.avg;
+        });
+
+        let html = "";
+        let displayRank = 1;
+        ranking.forEach((p, i) => {
+            if (i > 0) {
+                const prev = ranking[i-1];
+                const isSame = (p.total === prev.total && p.avg === prev.avg && p.apps === prev.apps);
+                if (!isSame) displayRank = i + 1;
+            }
+            html += `<tr><td>${displayRank}</td><td>${p.name}</td><td>${p.total}</td><td>${p.avg}</td><td>${p.apps}</td></tr>`;
+        });
+        document.querySelector("#rankingTable tbody").innerHTML = html;
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('onclick').includes(`'${sortType}'`)) btn.classList.add('active');
+        });
+
+        renderHistoryList();
+    }
+
+    function renderHistoryList() {
+        const listArea = document.getElementById("historyList");
+        if (matchHistory.length === 0) {
+            listArea.innerHTML = "<p style='color:#999; text-align:center; padding:20px;'>履歴はありません</p>";
+            return;
+        }
+        listArea.innerHTML = matchHistory.slice().reverse().map(m => {
+            const count = Object.keys(m.scores).length;
+            const totalScore = Object.values(m.scores).reduce((a, b) => a + b, 0);
+            const dateStr = m.date.slice(5).replace('-', '/');
+            
+            return `
+            <div class="history-item">
+                <span>${dateStr} (${count}名/${totalScore}点)</span>
+                <div class="history-btns">
+                    <span class="action-btn" style="color:#27ae60;" onclick="exportSingleMatch(${m.id})">出力</span>
+                    <span class="action-btn" style="color:#3498db;" onclick="editHistory(${m.id})">修正</span>
+                    <span class="delete-btn action-btn" onclick="deleteHistory(${m.id})">×</span>
+                </div>
+            </div>
+        `}).join('');
+    }
+
+    function exportToText() {
+        const dateArea = document.getElementById('dateDisplay').textContent;
+        let text = `⚽️ フットサルランキング ⚽️\n\n【${dateArea}】\n\n`;
+        document.querySelectorAll("#rankingTable tbody tr").forEach(tr => {
+            const d = tr.querySelectorAll("td");
+            text += `${d[0].textContent}位 ${d[1].textContent} (得点${d[2].textContent}/平均${d[3].textContent}/参加${d[4].textContent})\n`;
+        });
+        const out = document.getElementById('textOutput');
+        out.value = text; out.style.display = "block"; out.select();
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function exportSingleMatch(id) {
+        const match = matchHistory.find(m => m.id == id);
+        const formattedDate = match.date.replace(/-/g,'/');
+        const count = Object.keys(match.scores).length;
+        const totalScore = Object.values(match.scores).reduce((a, b) => a + b, 0);
+
+        let text = `⚽️フットサル結果報告⚽️\n\n【${formattedDate}】\n\n`;
+        text += `参加者：${count}名／合計：${totalScore}点\n`;
+        
+        const sortedEntries = Object.entries(match.scores).sort((a, b) => b[1] - a[1]);
+        sortedEntries.forEach(([name, score]) => {
+            text += `${name}：${score}点\n`;
+        });
+
+        const out = document.getElementById('textOutput');
+        out.value = text; out.style.display = "block"; out.select();
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function editHistory(id) {
+        const match = matchHistory.find(m => m.id == id);
+        document.getElementById('editingId').value = id;
+        document.getElementById('matchDate').value = match.date;
+        document.getElementById('inputLabel').textContent = "履歴を修正中";
+        document.getElementById('saveBtn').textContent = "更新内容を保存";
+        document.getElementById('cancelBtn').style.display = "block";
+        renderInputMemberList(match.scores);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteHistory(id) {
+        if(confirm("この履歴を削除しますか？")) {
+            matchHistory = matchHistory.filter(m => m.id !== id);
+            localStorage.setItem('futsal_v_final_history', JSON.stringify(matchHistory));
+            updateUI(currentSort);
+        }
+    }
+
+    function clearHistoryData() {
+        if(confirm("全ての試合履歴を完全に消去しますか？\n（登録メンバーリストは残ります）")) {
+            matchHistory = [];
+            localStorage.setItem('futsal_v_final_history', JSON.stringify(matchHistory));
+            updateUI(currentSort);
+            document.getElementById('textOutput').style.display = "none";
+        }
+    }
+</script>
+</body>
+</html>
